@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>سامانه حضور و غیاب آنلاین (حالت تست)</title>
+    <title>سامانه حضور و غیاب آنلاین</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: Tahoma, sans-serif; margin: 0; padding: 20px; background-color: #eef2f5; color: #333; }
@@ -22,13 +22,13 @@
 
     <div class="container">
         <div class="card">
-            <h2>📌 ثبت حضور و غیاب کلاس (حالت تست)</h2>
+            <h2>📌 ثبت حضور و غیاب کلاس</h2>
             
             <div id="user-info" class="user-badge">در حال دریافت اطلاعات...</div>
 
             <div style="text-align: right; margin-bottom: 15px;">
-                <label for="custom-name"><b>نام و نام خانوادگی (جهت ثبت در دفتر حضور غیاب):</b></label>
-                <input type="text" id="custom-name" placeholder="مثلاً: علی محمدی">
+                <label for="custom-name"><b>نام و نام خانوادگی واقعی دانش‌آموز:</b><br><small style="color: red;">(نوشتن نام الزامی است)</small></label>
+                <input type="text" id="custom-name" placeholder="نام خود را اینجا بنویسید...">
             </div>
 
             <button id="attendance-btn" class="btn-attendance" onclick="registerAttendance()">
@@ -44,47 +44,22 @@
         const SUPABASE_ANON_KEY = 'sb_publishable_6df-9vl0Iraj7Ou0SgnV3g_1_xDneAm';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+        // دریافت اطلاعات از لینک ایتا (اگر مستقیم باز شود مقادیر تستی نشان می‌دهد)
         const urlParams = new URLSearchParams(window.location.search);
-        const studentId = urlParams.get('user_id') || 1001; 
-        const eitaaProfileName = urlParams.get('name') || "دانش‌آموز نمونه";
+        const studentId = urlParams.get('user_id') || "1001 (تستی)"; 
+        const eitaaProfileName = urlParams.get('name') || "بدون نام (تستی)";
 
         document.getElementById('user-info').innerHTML = `
-            👤 <b>پروفایل ایتا:</b> ${eitaaProfileName}<br>
-            🆔 <b>شناسه:</b> ${studentId}
+            👤 <b>نام پروفایل ایتا:</b> ${eitaaProfileName}<br>
+            🆔 <b>شناسه ایتا:</b> ${studentId}
         `;
 
         function getJalaliDate() {
-            return new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                timeZone: 'Asia/Tehran'
-            }).format(new Date());
+            return new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tehran' }).format(new Date());
         }
 
         function getIranTime() {
-            return new Intl.DateTimeFormat('fa-IR', {
-                hour: '2-digit',
-                minute: '2-digit',
-                timeZone: 'Asia/Tehran'
-            }).format(new Date());
-        }
-
-        async function initAttendance() {
-            const customNameInput = document.getElementById('custom-name');
-            try {
-                const { data: studentData } = await supabaseClient
-                    .from('students')
-                    .select('custom_name')
-                    .eq('id', studentId)
-                    .single();
-
-                if (studentData && studentData.custom_name) {
-                    customNameInput.value = studentData.custom_name;
-                }
-            } catch (err) {
-                console.error("Error loading user:", err);
-            }
+            return new Intl.DateTimeFormat('fa-IR', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tehran' }).format(new Date());
         }
 
         async function registerAttendance() {
@@ -92,31 +67,34 @@
             const customName = document.getElementById('custom-name').value.trim();
 
             if (!customName) {
-                alert("لطفاً نام و نام خانوادگی خود را وارد کنید.");
+                alert("❌ برای ثبت حضور، حتماً باید نام و نام خانوادگی خود را در کادر بالا تایپ کنید!");
                 return;
             }
 
             btn.innerText = "در حال ثبت...";
-
             const today = new Date().toISOString().split('T')[0];
 
             try {
-                // ثبت/آپدیت نام کاربر
+                // ثبت کاربر در جدول کلی (فقط برای ثبت آیدی ایتا)
                 await supabaseClient.from('students').upsert({ 
-                    id: studentId, 
-                    full_name: eitaaProfileName,
-                    custom_name: customName
+                    id: urlParams.get('user_id') || 1001, 
+                    full_name: eitaaProfileName
                 });
 
-                // ثبت حضور
+                // ثبت حضور همراه با نامی که دقیقاً همین الان تایپ شده
                 const { error } = await supabaseClient.from('attendance').insert([
-                    { student_id: studentId, status_date: today }
+                    { 
+                        student_id: urlParams.get('user_id') || 1001, 
+                        status_date: today,
+                        entered_name: customName // ذخیره نام در برگه حضور
+                    }
                 ]);
 
                 if (error) {
                     showStatus("❌ خطا در ثبت حضور: " + error.message, "error");
                 } else {
-                    showStatus(`✅ حضور تست با موفقیت ثبت شد!<br>📅 تاریخ: ${getJalaliDate()}<br>⏰ ساعت: ${getIranTime()}`, "success");
+                    showStatus(`✅ حضور شما با نام <b>${customName}</b> ثبت شد!<br>📅 تاریخ: ${getJalaliDate()}<br>⏰ ساعت: ${getIranTime()}`, "success");
+                    document.getElementById('custom-name').value = ''; // خالی کردن کادر بعد از ثبت
                 }
             } catch (err) {
                 showStatus("❌ خطای غیرمنتظره: " + err.message, "error");
@@ -131,8 +109,6 @@
             statusBox.className = "status-message " + (type === "success" ? "status-success" : "status-error");
             statusBox.innerHTML = message;
         }
-
-        initAttendance();
     </script>
 </body>
 </html>
