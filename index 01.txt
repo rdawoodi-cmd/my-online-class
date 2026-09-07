@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>کلاس آنلاین من</title>
-    <!-- اضافه کردن کتابخانه Supabase -->
+    <!-- کتابخانه Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: Tahoma, sans-serif; margin: 0; padding: 15px; background-color: #f4f6f9; }
@@ -12,7 +12,7 @@
         button { background-color: #28a745; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; width: 100%; font-size: 16px; }
         input, textarea { width: 100%; padding: 8px; margin: 5px 0 10px 0; box-sizing: border-box; }
         .chat-box { height: 200px; overflow-y: scroll; border: 1px solid #ddd; padding: 10px; border-radius: 5px; background: #fafafa; }
-        .chat-msg { margin-bottom: 8px; border-bottom: 1px border #eee; padding-bottom: 4px; }
+        .chat-msg { margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
     </style>
 </head>
 <body>
@@ -36,28 +36,26 @@
     </div>
 
     <script>
-        // ۱. مقداردهی اولیه Supabase (اطلاعات خود را اینجا جایگزین کنید)
+        // تنظیمات متصل‌شده به دیتابیس سوپابیس شما
         const SUPABASE_URL = 'https://cxnztsdhnndijpyscvvg.supabase.co';
-        const SUPABASE_ANON_KEY = '
-sb_publishable_6df-9vl0Iraj7Ou0SgnV3g_1_xDneAm';
+        const SUPABASE_ANON_KEY = 'sb_publishable_6df-9vl0Iraj7Ou0SgnV3g_1_xDneAm';
         const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // ۲. دریافت شناسه کاربر (از URL ایتا یا حالت تست)
+        // دریافت شناسه کاربر (از URL یا به صورت آزمایشی)
         const urlParams = new URLSearchParams(window.location.search);
-        // اگر شناسه در URL نبود، یک آیدی تست ایجاد می‌کند
         const studentId = urlParams.get('user_id') || 1001; 
         const studentName = urlParams.get('name') || "دانش‌آموز نمونه";
 
         document.getElementById('user-info').innerText = `خوش آمدید: ${studentName} (شناسه: ${studentId})`;
 
-        // ثبت یا آپدیت دانش‌آموز در دیتابیس
+        // ثیت یا به‌روزرسانی مشخصات کاربر
         async function initUser() {
             await supabase.from('students').upsert({ id: studentId, full_name: studentName });
             loadMessages();
             listenToNewMessages();
         }
 
-        // ۳. عملکرد ثبت حضور و غیاب
+        // عملکرد ثبت حضور و غیاب
         async function registerAttendance() {
             const { data, error } = await supabase.from('attendance').insert([
                 { student_id: studentId }
@@ -70,7 +68,7 @@ sb_publishable_6df-9vl0Iraj7Ou0SgnV3g_1_xDneAm';
             }
         }
 
-        // ۴. ارسال پیام در چت
+        // ارسال پیام در چت
         async function sendMessage() {
             const input = document.getElementById('msg-input');
             const content = input.value.trim();
@@ -82,18 +80,20 @@ sb_publishable_6df-9vl0Iraj7Ou0SgnV3g_1_xDneAm';
             input.value = '';
         }
 
-        // ۵. دریافت پیام‌های چت
+        // بارگذاری پیام‌ها
         async function loadMessages() {
             const { data: messages } = await supabase.from('messages').select('*').order('created_at', { ascending: true });
             const chatBox = document.getElementById('chat-box');
             chatBox.innerHTML = '';
-            messages.forEach(msg => {
-                chatBox.innerHTML += `<div class="chat-msg"><b>${msg.sender_name}:</b> ${msg.content}</div>`;
-            });
-            chatBox.scrollTop = chatBox.scrollHeight;
+            if (messages) {
+                messages.forEach(msg => {
+                    chatBox.innerHTML += `<div class="chat-msg"><b>${msg.sender_name}:</b> ${msg.content}</div>`;
+                });
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
         }
 
-        // ۶. دریافت لحظه‌ای پیام‌های جدید (Realtime Chat)
+        // دریافت لحظه‌ای پیام‌ها (Realtime)
         function listenToNewMessages() {
             supabase
                 .channel('public:messages')
@@ -106,7 +106,7 @@ sb_publishable_6df-9vl0Iraj7Ou0SgnV3g_1_xDneAm';
                 .subscribe();
         }
 
-        // اجرا هنگام ورود به صفحه
+        // اجرای اولیه هنگام باز شدن صفحه
         initUser();
     </script>
 </body>
