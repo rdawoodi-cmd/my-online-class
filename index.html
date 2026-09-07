@@ -9,10 +9,11 @@
         body { font-family: Tahoma, sans-serif; margin: 0; padding: 20px; background-color: #eef2f5; color: #333; }
         .container { max-width: 500px; margin: 30px auto; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); text-align: center; }
-        h2 { margin-top: 0; color: #2c3e50; font-size: 22px; }
-        .user-badge { background-color: #e8f4fd; color: #1d6fce; padding: 10px 15px; border-radius: 8px; font-weight: bold; margin-bottom: 15px; display: block; text-align: right; }
-        input[type="text"], select { width: 100%; padding: 10px; margin: 8px 0 15px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-family: Tahoma; font-size: 14px; }
+        h2 { margin-top: 0; color: #2c3e50; font-size: 20px; }
+        .info-box { background-color: #e8f4fd; color: #1d6fce; padding: 12px 15px; border-radius: 8px; font-weight: bold; margin-bottom: 20px; text-align: center; font-size: 14px; }
+        input[type="text"], select { width: 100%; padding: 11px; margin: 8px 0 15px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-family: Tahoma; font-size: 14px; }
         .btn-attendance { background-color: #27ae60; color: white; border: none; padding: 14px 20px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 18px; font-weight: bold; }
+        .btn-attendance:hover { background-color: #219150; }
         .status-message { margin-top: 20px; padding: 12px; border-radius: 8px; font-weight: bold; display: none; text-align: right; }
         .status-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
         .status-error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
@@ -24,7 +25,9 @@
         <div class="card">
             <h2>📌 ثبت حضور و غیاب کلاس</h2>
             
-            <div id="user-info" class="user-badge">در حال دریافت اطلاعات...</div>
+            <div id="user-info" class="info-box">
+                لطفاً اطلاعات زیر را جهت ثبت حضور دقیق وارد کنید
+            </div>
 
             <div style="text-align: right; margin-bottom: 10px;">
                 <label for="course-select"><b>انتخاب درس:</b> <small style="color: red;">*</small></label>
@@ -46,9 +49,14 @@
                 </select>
             </div>
 
-            <div style="text-align: right; margin-bottom: 15px;">
+            <div style="text-align: right; margin-bottom: 10px;">
                 <label for="custom-name"><b>نام و نام خانوادگی دانش‌آموز:</b> <small style="color: red;">*</small></label>
-                <input type="text" id="custom-name" placeholder="نام خود را اینجا بنویسید...">
+                <input type="text" id="custom-name" placeholder="مثلاً: علی محمدی">
+            </div>
+
+            <div style="text-align: right; margin-bottom: 15px;">
+                <label for="eitaa-username"><b>آیدی یا نام اکانت ایتا:</b> <small style="color: red;">*</small></label>
+                <input type="text" id="eitaa-username" placeholder="مثلاً: @ali_1388 یا نام اکانت">
             </div>
 
             <button id="attendance-btn" class="btn-attendance" onclick="registerAttendance()">
@@ -66,13 +74,7 @@
 
         const urlParams = new URLSearchParams(window.location.search);
         const rawStudentId = urlParams.get('user_id');
-        const studentId = rawStudentId ? parseInt(rawStudentId, 10) : 1001;
-        const eitaaProfileName = urlParams.get('name') || "بدون نام (تستی)";
-
-        document.getElementById('user-info').innerHTML = `
-            👤 <b>نام پروفایل ایتا:</b> ${eitaaProfileName}<br>
-            🆔 <b>شناسه ایتا:</b> ${studentId}
-        `;
+        const eitaaProfileNameFromUrl = urlParams.get('name');
 
         function getJalaliDate() {
             return new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tehran' }).format(new Date());
@@ -85,9 +87,11 @@
         async function registerAttendance() {
             const btn = document.getElementById('attendance-btn');
             const nameInput = document.getElementById('custom-name');
+            const usernameInput = document.getElementById('eitaa-username');
             const courseSelect = document.getElementById('course-select');
             
             const customName = nameInput.value.trim();
+            const eitaaUsername = usernameInput.value.trim();
             const selectedCourse = courseSelect.value;
 
             if (!selectedCourse) {
@@ -100,6 +104,11 @@
                 return;
             }
 
+            if (!eitaaUsername) {
+                alert("❌ لطفاً آیدی یا نام اکانت ایتای خود را وارد کنید!");
+                return;
+            }
+
             btn.disabled = true;
             btn.innerText = "در حال ثبت...";
 
@@ -107,12 +116,18 @@
             const iranTimeStr = getIranTime();
             const today = new Date().toISOString().split('T')[0];
 
+            // تولید آیدی عددی منحصر به فرد در صورت عدم وجود
+            const studentId = rawStudentId ? parseInt(rawStudentId, 10) : Math.floor(Math.random() * 899999) + 100000;
+            const profileNameToSave = eitaaProfileNameFromUrl || eitaaUsername;
+
             try {
+                // ثبت یا به‌روزرسانی پروفایل
                 await supabaseClient.from('students').upsert({ 
                     id: studentId, 
-                    full_name: eitaaProfileName
+                    full_name: profileNameToSave
                 });
 
+                // ثبت تردد دانش‌آموز
                 const { error } = await supabaseClient.from('attendance').insert([
                     { 
                         student_id: studentId, 
@@ -126,8 +141,9 @@
                 if (error) {
                     showStatus("❌ خطا در ثبت حضور: " + error.message, "error");
                 } else {
-                    showStatus(`✅ حضور شما در درس <b>${selectedCourse}</b> با نام <b>${customName}</b> ثبت شد!<br>📅 تاریخ: ${jalaliDateStr}<br>⏰ ساعت: ${iranTimeStr}`, "success");
+                    showStatus(`✅ حضور شما در درس <b>${selectedCourse}</b> ثبت شد!<br>👤 نام: ${customName}<br>🆔 اکانت ایتا: ${eitaaUsername}<br>📅 تاریخ: ${jalaliDateStr}<br>⏰ ساعت: ${iranTimeStr}`, "success");
                     nameInput.value = '';
+                    usernameInput.value = '';
                     courseSelect.value = '';
                 }
             } catch (err) {
