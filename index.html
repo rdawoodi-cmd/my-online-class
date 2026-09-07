@@ -15,7 +15,7 @@
 
     <style>
         body { font-family: Tahoma, sans-serif; margin: 0; padding: 20px; background-color: #eef2f5; color: #333; }
-        .container { max-width: 550px; margin: 20px auto; }
+        .container { max-width: 100%; margin: 0 auto; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); text-align: center; position: relative; margin-bottom: 20px; }
         h2 { margin-top: 10px; color: #2c3e50; font-size: 20px; }
         
@@ -60,7 +60,7 @@
     <div class="container">
         <!-- بخش دانش‌آموز -->
         <div id="student-view" class="card">
-            <span id="version-display" class="version-badge">v2.3</span>
+            <span id="version-display" class="version-badge">v2.4</span>
             <h2>📌 ثبت حضور و غیاب کلاس</h2>
             
             <div id="user-info" class="info-box">
@@ -149,7 +149,7 @@
     </div>
 
     <script>
-        const APP_VERSION = "v2.3";
+        const APP_VERSION = "v2.4";
         document.getElementById('version-display').innerText = APP_VERSION;
 
         const SUPABASE_URL = 'https://cxnztsdhnndijpyscvvg.supabase.co';
@@ -159,11 +159,16 @@
         let currentEitaaUserId = null;
         let currentEitaaProfileName = '';
 
-        // تابع استانداردساز اعداد (تبدیل همه ارقام فارسی و انگلیسی به یک فرمت برای مقایسه دقیق)
         function normalizeDigits(str) {
             if (!str) return '';
             return str.replace(/[۰-۹]/g, d => '0123456789'['۰۱۲۳۴۵۶۷۸۹'.indexOf(d)])
                       .replace(/[0-9]/g, d => '0123456789'[d]);
+        }
+
+        function formatTime(isoString) {
+            if (!isoString) return '-';
+            const date = new Date(isoString);
+            return date.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         }
 
         $(document).ready(function() {
@@ -182,13 +187,19 @@
         function initEitaaUser() {
             try {
                 const wa = window.Eitaa && window.Eitaa.WebApp;
-                if (wa && wa.initDataUnsafe && wa.initDataUnsafe.user) {
-                    const user = wa.initDataUnsafe.user;
-                    currentEitaaUserId = user.id;
-                    currentEitaaProfileName = [user.first_name, user.last_name].filter(Boolean).join(" ");
+                if (wa) {
+                    // ماکسیمایز / تمام‌صفحه کردن پنجره در ایتا
+                    if (typeof wa.expand === 'function') {
+                        wa.expand();
+                    }
+                    if (wa.initDataUnsafe && wa.initDataUnsafe.user) {
+                        const user = wa.initDataUnsafe.user;
+                        currentEitaaUserId = user.id;
+                        currentEitaaProfileName = [user.first_name, user.last_name].filter(Boolean).join(" ");
+                    }
                 }
             } catch (e) {
-                console.log("خطا در خواندن وب‌اپ ایتا:", e);
+                console.log("خطا در خواندن وب‌ап ایتا:", e);
             }
 
             const infoBox = document.getElementById('user-info');
@@ -319,7 +330,6 @@
             resultDiv.innerHTML = "در حال جستجوی هوشمند گزارش...";
 
             try {
-                // دریافت رکوردها (بر اساس درس در صورت انتخاب، یا کل رکوردها)
                 let query = supabaseClient.from('attendance').select('*').order('created_at', { ascending: false });
 
                 if (course) {
@@ -338,7 +348,6 @@
                     return;
                 }
 
-                // فیلتر هوشمند در جاوااسکریپت با تطبیق ارقام فارسی و انگلیسی
                 const normalizedInput = normalizeDigits(rawDateStr);
                 const filteredData = data.filter(row => {
                     if (!row.jalali_date) return false;
@@ -367,6 +376,7 @@
                                <th>نام دانش‌آموز</th>
                                <th>درس</th>
                                <th>تاریخ ثبت‌شده</th>
+                               <th>ساعت ورود</th>
                                <th>پروفایل ایتا</th>
                            </tr>
                         </thead>
@@ -378,6 +388,7 @@
                             <td><b>${row.entered_name || 'نامشخص'}</b></td>
                             <td>${row.subject || '-'}</td>
                             <td style="color: blue; font-weight: bold;">${row.jalali_date || '-'}</td>
+                            <td style="color: #27ae60; font-weight: bold; direction: ltr; text-align: right;">${formatTime(row.created_at)}</td>
                             <td>${row.eitaa_profile_name || 'ثبت نشده'}</td>
                          </tr>`;
             });
