@@ -34,11 +34,14 @@
         .info-box { background-color: #e8f4fd; color: #1d6fce; padding: 12px 15px; border-radius: 8px; font-weight: bold; margin-bottom: 20px; text-align: center; font-size: 14px; border-right: 4px solid #1d6fce; }
         input[type="text"], select { width: 100%; padding: 11px; margin: 8px 0 15px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-family: Tahoma; font-size: 14px; }
         
-        .btn-attendance { background-color: #27ae60; color: white; border: none; padding: 14px 20px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 18px; font-weight: bold; }
+        .btn-attendance { background-color: #27ae60; color: white; border: none; padding: 14px 20px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 18px; font-weight: bold; margin-bottom: 10px; }
         .btn-attendance:hover { background-color: #219150; }
 
         .btn-teacher { background-color: #2980b9; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 15px; font-weight: bold; margin-top: 10px; }
         .btn-teacher:hover { background-color: #2471a3; }
+
+        .btn-all { background-color: #e67e22; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 16px; font-weight: bold; margin-top: 10px; }
+        .btn-all:hover { background-color: #d35400; }
 
         .btn-back { background-color: #7f8c8d; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 15px; font-weight: bold; margin-bottom: 15px; }
         .btn-back:hover { background-color: #707b7c; }
@@ -57,7 +60,7 @@
     <div class="container">
         <!-- بخش دانش‌آموز -->
         <div id="student-view" class="card">
-            <span id="version-display" class="version-badge">v2.1</span>
+            <span id="version-display" class="version-badge">v2.3</span>
             <h2>📌 ثبت حضور و غیاب کلاس</h2>
             
             <div id="user-info" class="info-box">
@@ -134,7 +137,11 @@
             </div>
 
             <button class="btn-attendance" style="background-color: #2980b9;" onclick="fetchAttendanceReport()">
-                دریافت گزارش حضور و غیاب
+                🔍 جستجوی هوشمند بر اساس درس و تاریخ
+            </button>
+
+            <button class="btn-all" onclick="fetchAllRecords()">
+                📂 نمایش کل رکوردهای ثبت‌شده
             </button>
 
             <div id="report-result" style="margin-top: 20px; overflow-x: auto;"></div>
@@ -142,7 +149,7 @@
     </div>
 
     <script>
-        const APP_VERSION = "v2.1";
+        const APP_VERSION = "v2.3";
         document.getElementById('version-display').innerText = APP_VERSION;
 
         const SUPABASE_URL = 'https://cxnztsdhnndijpyscvvg.supabase.co';
@@ -152,16 +159,17 @@
         let currentEitaaUserId = null;
         let currentEitaaProfileName = '';
 
-        // تبدیل اعداد انگلیسی به فارسی برای هماهنگی با دیتابیس
-        function toPersianDigits(str) {
+        // تابع استانداردساز اعداد (تبدیل همه ارقام فارسی و انگلیسی به یک فرمت برای مقایسه دقیق)
+        function normalizeDigits(str) {
             if (!str) return '';
-            return str.replace(/[0-9]/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
+            return str.replace(/[۰-۹]/g, d => '0123456789'['۰۱۲۳۴۵۶۷۸۹'.indexOf(d)])
+                      .replace(/[0-9]/g, d => '0123456789'[d]);
         }
 
         $(document).ready(function() {
             $("#report-date").persianDatepicker({
                 format: 'YYYY/MM/DD',
-                initialValue: true,
+                initialValue: false,
                 autoClose: true,
                 toolbox: {
                     calendarSwitch: {
@@ -254,8 +262,7 @@
                     showStatus("❌ خطا در ثبت حضور: " + error.message, "error");
                 } else {
                     showStatus(`✅ حضور شما در درس <b>${selectedCourse}</b> ثبت شد!<br>👤 نام: ${customName}<br>📅 تاریخ: ${jalaliDateStr}`, "success");
-                    nameInput.value = '';
-                    courseSelect.value = '';
+                    nameInfoReset();
                 }
             } catch (err) {
                 showStatus("❌ خطای غیرمنتظره: " + err.message, "error");
@@ -265,24 +272,58 @@
             }
         }
 
+        function nameInfoReset() {
+            document.getElementById('custom-name').value = '';
+            document.getElementById('course-select').value = '';
+        }
+
+        async function fetchAllRecords() {
+            const course = document.getElementById('report-course').value;
+            const resultDiv = document.getElementById('report-result');
+            resultDiv.innerHTML = "در حال بارگذاری همه رکوردها...";
+
+            try {
+                let query = supabaseClient.from('attendance').select('*').order('created_at', { ascending: false });
+                if (course) {
+                    query = query.eq('subject', course);
+                }
+
+                const { data, error } = await query;
+
+                if (error) {
+                    resultDiv.innerHTML = `<p style="color: red;">خطا: ${error.message}</p>`;
+                    return;
+                }
+
+                if (!data || data.length === 0) {
+                    resultDiv.innerHTML = `<p style="color: #666; margin-top: 15px;">رکوردی یافت نشد.</p>`;
+                    return;
+                }
+
+                displayTable(data, resultDiv);
+            } catch (err) {
+                resultDiv.innerHTML = `<p style="color: red;">خطا: ${err.message}</p>`;
+            }
+        }
+
         async function fetchAttendanceReport() {
             const course = document.getElementById('report-course').value;
             let rawDateStr = document.getElementById('report-date').value.trim();
             const resultDiv = document.getElementById('report-result');
 
-            resultDiv.innerHTML = "در حال بارگذاری گزارش...";
+            if (!rawDateStr) {
+                alert("لطفاً یک تاریخ از تقویم انتخاب کنید.");
+                return;
+            }
+
+            resultDiv.innerHTML = "در حال جستجوی هوشمند گزارش...";
 
             try {
+                // دریافت رکوردها (بر اساس درس در صورت انتخاب، یا کل رکوردها)
                 let query = supabaseClient.from('attendance').select('*').order('created_at', { ascending: false });
 
                 if (course) {
                     query = query.eq('subject', course);
-                }
-                if (rawDateStr) {
-                    // تبدیل تاریخ تقویم (اعداد انگلیسی) به فرمت دیتابیس (اعداد فارسی)
-                    const persianDateStr = toPersianDigits(rawDateStr);
-                    // جستجو به صورت انعطاف‌پذیر (هم دقیق و هم شامل)
-                    query = query.or(`jalali_date.eq.${persianDateStr},jalali_date.ilike.%${rawDateStr}%`);
                 }
 
                 const { data, error } = await query;
@@ -293,39 +334,56 @@
                 }
 
                 if (!data || data.length === 0) {
-                    resultDiv.innerHTML = `<p style="color: #666; margin-top: 15px;">رکوردی برای این تاریخ و درس یافت نشد.</p>`;
+                    resultDiv.innerHTML = `<p style="color: #666; margin-top: 15px;">رکوردی یافت نشد.</p>`;
                     return;
                 }
 
-                let html = `<p style="font-weight: bold; text-align: right;">تعداد موارد یافت شده: ${data.length}</p>`;
-                html += `<table class="report-table">
-                            <thead>
-                               <tr>
-                                   <th>ردیف</th>
-                                   <th>نام دانش‌آموز</th>
-                                   <th>درس</th>
-                                   <th>تاریخ</th>
-                                   <th>پروفایل ایتا</th>
-                               </tr>
-                            </thead>
-                            <tbody>`;
-
-                data.forEach((row, index) => {
-                    html += `<tr>
-                                <td>${index + 1}</td>
-                                <td><b>${row.entered_name || 'نامشخص'}</b></td>
-                                <td>${row.subject || '-'}</td>
-                                <td>${row.jalali_date || '-'}</td>
-                                <td>${row.eitaa_profile_name || 'ثبت نشده'}</td>
-                             </tr>`;
+                // فیلتر هوشمند در جاوااسکریپت با تطبیق ارقام فارسی و انگلیسی
+                const normalizedInput = normalizeDigits(rawDateStr);
+                const filteredData = data.filter(row => {
+                    if (!row.jalali_date) return false;
+                    const normalizedRowDate = normalizeDigits(row.jalali_date);
+                    return normalizedRowDate.includes(normalizedInput) || normalizedInput.includes(normalizedRowDate);
                 });
 
-                html += `</tbody></table>`;
-                resultDiv.innerHTML = html;
+                if (filteredData.length === 0) {
+                    resultDiv.innerHTML = `<p style="color: #666; margin-top: 15px;">رکوردی با تاریخ <b>${rawDateStr}</b> یافت نشد.</p>`;
+                    return;
+                }
+
+                displayTable(filteredData, resultDiv);
 
             } catch (err) {
                 resultDiv.innerHTML = `<p style="color: red;">خطا: ${err.message}</p>`;
             }
+        }
+
+        function displayTable(data, resultDiv) {
+            let html = `<p style="font-weight: bold; text-align: right;">تعداد موارد یافت شده: ${data.length}</p>`;
+            html += `<table class="report-table">
+                        <thead>
+                           <tr>
+                               <th>ردیف</th>
+                               <th>نام دانش‌آموز</th>
+                               <th>درس</th>
+                               <th>تاریخ ثبت‌شده</th>
+                               <th>پروفایل ایتا</th>
+                           </tr>
+                        </thead>
+                        <tbody>`;
+
+            data.forEach((row, index) => {
+                html += `<tr>
+                            <td>${index + 1}</td>
+                            <td><b>${row.entered_name || 'نامشخص'}</b></td>
+                            <td>${row.subject || '-'}</td>
+                            <td style="color: blue; font-weight: bold;">${row.jalali_date || '-'}</td>
+                            <td>${row.eitaa_profile_name || 'ثبت نشده'}</td>
+                         </tr>`;
+            });
+
+            html += `</tbody></table>`;
+            resultDiv.innerHTML = html;
         }
 
         function showStatus(message, type) {
