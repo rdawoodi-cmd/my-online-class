@@ -54,7 +54,7 @@
                 <input type="text" id="custom-name" placeholder="مثلاً: علی محمدی">
             </div>
 
-            <!-- ذخیره مخفی نام/آیدی ایتا (از دید کاربر پنهان است) -->
+            <!-- ذخیره مخفی نام/آیدی ایتا -->
             <input type="hidden" id="eitaa-username">
 
             <button id="attendance-btn" class="btn-attendance" onclick="registerAttendance()">
@@ -70,13 +70,18 @@
         const SUPABASE_ANON_KEY = 'sb_publishable_6df-9vl0Iraj7Ou0SgnV3g_1_xDneAm';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // دریافت مخفیانه متغیرها از لینک ایتا
+        // دریافت پارامترهای ارسال شده از ایتا
         const urlParams = new URLSearchParams(window.location.search);
         const rawStudentId = urlParams.get('user_id');
-        const urlProfileName = urlParams.get('name') || 'کاربر ایتا (بدون نام)';
+        
+        // استخراج هوشمند نام پروفایل از پارامترهای مختلف
+        const detectedName = urlParams.get('firstname') || 
+                             urlParams.get('name') || 
+                             urlParams.get('username') || 
+                             (rawStudentId ? `کاربر ایتا (${rawStudentId})` : 'نامشخص (ارسال نشده)');
 
-        // ذخیره نام پروفایل ایتا در متغیر مخفی
-        document.getElementById('eitaa-username').value = urlProfileName;
+        // ذخیره نام شناسایی‌شده در فیلد مخفی
+        document.getElementById('eitaa-username').value = detectedName;
 
         function getJalaliDate() {
             return new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tehran' }).format(new Date());
@@ -107,17 +112,16 @@
             const jalaliDateStr = getJalaliDate();
             const today = new Date().toISOString().split('T')[0];
 
-            // آیدی عددی ایتا یا یک شناسه یکتا
             const studentId = rawStudentId ? parseInt(rawStudentId, 10) : Math.floor(Math.random() * 899999) + 100000;
 
             try {
-                // ۱. ثبت نام پروفایل ایتا در جدول students
+                // ۱. ثبت مشخصات در جدول students
                 await supabaseClient.from('students').upsert({ 
                     id: studentId, 
                     full_name: eitaaProfileName
                 });
 
-                // ۲. ثبت نام دستی و درس در جدول attendance
+                // ۲. ثبت اطلاعات حضور و غیاب
                 const { error } = await supabaseClient.from('attendance').insert([
                     { 
                         student_id: studentId, 
