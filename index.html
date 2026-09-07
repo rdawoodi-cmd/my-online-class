@@ -7,7 +7,7 @@
     <script src="https://developer.eitaa.com/eitaa-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
-    <!-- اضافه کردن استایل و اسکریپت تقویم شمسی جی‌کوئری -->
+    <!-- تقویم شمسی -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/css/persian-datepicker.min.css">
     <script src="https://cdn.jsdelivr.net/npm/persian-date@1.1.0/dist/persian-date.min.js"></script>
@@ -57,7 +57,7 @@
     <div class="container">
         <!-- بخش دانش‌آموز -->
         <div id="student-view" class="card">
-            <span id="version-display" class="version-badge">v2.0</span>
+            <span id="version-display" class="version-badge">v2.1</span>
             <h2>📌 ثبت حضور و غیاب کلاس</h2>
             
             <div id="user-info" class="info-box">
@@ -142,7 +142,7 @@
     </div>
 
     <script>
-        const APP_VERSION = "v2.0";
+        const APP_VERSION = "v2.1";
         document.getElementById('version-display').innerText = APP_VERSION;
 
         const SUPABASE_URL = 'https://cxnztsdhnndijpyscvvg.supabase.co';
@@ -152,7 +152,12 @@
         let currentEitaaUserId = null;
         let currentEitaaProfileName = '';
 
-        // فعال‌سازی تقویم شمسی روی فیلد تاریخ
+        // تبدیل اعداد انگلیسی به فارسی برای هماهنگی با دیتابیس
+        function toPersianDigits(str) {
+            if (!str) return '';
+            return str.replace(/[0-9]/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
+        }
+
         $(document).ready(function() {
             $("#report-date").persianDatepicker({
                 format: 'YYYY/MM/DD',
@@ -262,7 +267,7 @@
 
         async function fetchAttendanceReport() {
             const course = document.getElementById('report-course').value;
-            const dateStr = document.getElementById('report-date').value.trim();
+            let rawDateStr = document.getElementById('report-date').value.trim();
             const resultDiv = document.getElementById('report-result');
 
             resultDiv.innerHTML = "در حال بارگذاری گزارش...";
@@ -273,8 +278,11 @@
                 if (course) {
                     query = query.eq('subject', course);
                 }
-                if (dateStr) {
-                    query = query.eq('jalali_date', dateStr);
+                if (rawDateStr) {
+                    // تبدیل تاریخ تقویم (اعداد انگلیسی) به فرمت دیتابیس (اعداد فارسی)
+                    const persianDateStr = toPersianDigits(rawDateStr);
+                    // جستجو به صورت انعطاف‌پذیر (هم دقیق و هم شامل)
+                    query = query.or(`jalali_date.eq.${persianDateStr},jalali_date.ilike.%${rawDateStr}%`);
                 }
 
                 const { data, error } = await query;
