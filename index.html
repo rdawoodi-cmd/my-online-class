@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>سامانه حضور و غیاب آنلاین</title>
+    <!-- اسکریپت رسمی وب‌اپ ایتا -->
     <script src="https://developer.eitaa.com/eitaa-web-app.js"></script>
+    <!-- کتابخانه سوپابیس -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: Tahoma, sans-serif; margin: 0; padding: 20px; background-color: #eef2f5; color: #333; }
@@ -37,7 +39,7 @@
 
     <div class="container">
         <div class="card">
-            <span id="version-display" class="version-badge">v1.5</span>
+            <span id="version-display" class="version-badge">v1.6</span>
 
             <h2>📌 ثبت حضور و غیاب کلاس</h2>
             
@@ -65,14 +67,9 @@
                 </select>
             </div>
 
-            <div style="text-align: right; margin-bottom: 10px;">
+            <div style="text-align: right; margin-bottom: 15px;">
                 <label for="custom-name"><b>نام و نام خانوادگی دانش‌آموز:</b> <small style="color: red;">*</small></label>
                 <input type="text" id="custom-name" placeholder="مثلاً: علی محمدی">
-            </div>
-
-            <div style="text-align: right; margin-bottom: 15px;">
-                <label for="class-code"><b>کد اختصاصی کلاس/گروه:</b> <small style="color: red;">*</small></label>
-                <input type="text" id="class-code" placeholder="کدی که معلم داده را وارد کنید">
             </div>
 
             <button id="attendance-btn" class="btn-attendance" onclick="registerAttendance()">
@@ -84,7 +81,7 @@
     </div>
 
     <script>
-        const APP_VERSION = "v1.5";
+        const APP_VERSION = "v1.6";
         document.getElementById('version-display').innerText = APP_VERSION;
 
         const SUPABASE_URL = 'https://cxnztsdhnndijpyscvvg.supabase.co';
@@ -123,12 +120,10 @@
         async function registerAttendance() {
             const btn = document.getElementById('attendance-btn');
             const nameInput = document.getElementById('custom-name');
-            const courseSelect = document.getElementById('course-select');
-            const classCodeInput = document.getElementById('class-code');
+            courseSelect = document.getElementById('course-select');
             
             const customName = nameInput.value.trim();
             const selectedCourse = courseSelect.value;
-            const classCode = classCodeInput.value.trim();
 
             if (!selectedCourse) {
                 alert("❌ لطفاً درس مورد نظر را انتخاب کنید!");
@@ -137,11 +132,6 @@
 
             if (!customName) {
                 alert("❌ لطفاً نام و نام خانوادگی خود را وارد کنید!");
-                return;
-            }
-
-            if (!classCode) {
-                alert("❌ لطفاً کد اختصاصی کلاس را وارد کنید!");
                 return;
             }
 
@@ -167,18 +157,16 @@
                         subject: selectedCourse,
                         jalali_date: jalaliDateStr,
                         eitaa_user_id: currentEitaaUserId,
-                        eitaa_profile_name: currentEitaaProfileName,
-                        class_code: classCode
+                        eitaa_profile_name: currentEitaaProfileName
                     }
                 ]);
 
                 if (error) {
                     showStatus("❌ خطا در ثبت حضور: " + error.message, "error");
                 } else {
-                    showStatus(`✅ حضور شما در درس <b>${selectedCourse}</b> ثبت شد!<br>👤 نام: ${customName}<br>🔑 کد کلاس: ${classCode}<br>📅 تاریخ: ${jalaliDateStr}`, "success");
+                    showStatus(`✅ حضور شما در درس <b>${selectedCourse}</b> ثبت شد!<br>👤 نام: ${customName}<br>📅 تاریخ: ${jalaliDateStr}`, "success");
                     nameInput.value = '';
                     courseSelect.value = '';
-                    classCodeInput.value = '';
                 }
             } catch (err) {
                 showStatus("❌ خطای غیرمنتظره: " + err.message, "error");
