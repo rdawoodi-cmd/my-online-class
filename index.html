@@ -49,15 +49,13 @@
                 </select>
             </div>
 
-            <div style="text-align: right; margin-bottom: 10px;">
+            <div style="text-align: right; margin-bottom: 15px;">
                 <label for="custom-name"><b>نام و نام خانوادگی دانش‌آموز:</b> <small style="color: red;">*</small></label>
                 <input type="text" id="custom-name" placeholder="مثلاً: علی محمدی">
             </div>
 
-            <div style="text-align: right; margin-bottom: 15px;">
-                <label for="eitaa-username"><b>آیدی یا نام اکانت ایتا:</b> <small style="color: red;">*</small></label>
-                <input type="text" id="eitaa-username" placeholder="مثلاً: @ali_1388 یا نام اکانت">
-            </div>
+            <!-- ذخیره مخفی نام/آیدی ایتا (از دید کاربر پنهان است) -->
+            <input type="hidden" id="eitaa-username">
 
             <button id="attendance-btn" class="btn-attendance" onclick="registerAttendance()">
                 ثبت حضور در کلاس
@@ -72,26 +70,16 @@
         const SUPABASE_ANON_KEY = 'sb_publishable_6df-9vl0Iraj7Ou0SgnV3g_1_xDneAm';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // دریافت متغیرها از URL
+        // دریافت مخفیانه متغیرها از لینک ایتا
         const urlParams = new URLSearchParams(window.location.search);
         const rawStudentId = urlParams.get('user_id');
-        const urlProfileName = urlParams.get('name');
+        const urlProfileName = urlParams.get('name') || 'کاربر ایتا (بدون نام)';
 
-        const usernameInput = document.getElementById('eitaa-username');
-        const userInfoBox = document.getElementById('user-info');
-
-        // پر کردن خودکار کادر در صورت وجود اطلاعات
-        if (urlProfileName) {
-            usernameInput.value = urlProfileName;
-            userInfoBox.innerHTML = `👋 سلام <b>${urlProfileName}</b> عزیز، لطفاً درس و نام کلاس را مشخص کنید.`;
-        }
+        // ذخیره نام پروفایل ایتا در متغیر مخفی
+        document.getElementById('eitaa-username').value = urlProfileName;
 
         function getJalaliDate() {
             return new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tehran' }).format(new Date());
-        }
-
-        function getIranTime() {
-            return new Intl.DateTimeFormat('fa-IR', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Tehran' }).format(new Date());
         }
 
         async function registerAttendance() {
@@ -100,7 +88,7 @@
             const courseSelect = document.getElementById('course-select');
             
             const customName = nameInput.value.trim();
-            const eitaaUsername = usernameInput.value.trim();
+            const eitaaProfileName = document.getElementById('eitaa-username').value;
             const selectedCourse = courseSelect.value;
 
             if (!selectedCourse) {
@@ -113,29 +101,23 @@
                 return;
             }
 
-            if (!eitaaUsername) {
-                alert("❌ لطفاً آیدی یا نام اکانت ایتای خود را وارد کنید!");
-                return;
-            }
-
             btn.disabled = true;
             btn.innerText = "در حال ثبت...";
 
             const jalaliDateStr = getJalaliDate();
-            const iranTimeStr = getIranTime();
             const today = new Date().toISOString().split('T')[0];
 
-            // ایجاد آیدی عددی منحصر به فرد
+            // آیدی عددی ایتا یا یک شناسه یکتا
             const studentId = rawStudentId ? parseInt(rawStudentId, 10) : Math.floor(Math.random() * 899999) + 100000;
 
             try {
-                // ۱. ثبت مشخصات اکانت ایتا
+                // ۱. ثبت نام پروفایل ایتا در جدول students
                 await supabaseClient.from('students').upsert({ 
                     id: studentId, 
-                    full_name: eitaaUsername
+                    full_name: eitaaProfileName
                 });
 
-                // ۲. ثبت اطلاعات حضور و غیاب
+                // ۲. ثبت نام دستی و درس در جدول attendance
                 const { error } = await supabaseClient.from('attendance').insert([
                     { 
                         student_id: studentId, 
@@ -149,7 +131,7 @@
                 if (error) {
                     showStatus("❌ خطا در ثبت حضور: " + error.message, "error");
                 } else {
-                    showStatus(`✅ حضور شما در درس <b>${selectedCourse}</b> ثبت شد!<br>👤 نام: ${customName}<br>🆔 اکانت ایتا: ${eitaaUsername}<br>📅 تاریخ: ${jalaliDateStr}`, "success");
+                    showStatus(`✅ حضور شما در درس <b>${selectedCourse}</b> ثبت شد!<br>👤 نام: ${customName}<br>📅 تاریخ: ${jalaliDateStr}`, "success");
                     nameInput.value = '';
                     courseSelect.value = '';
                 }
