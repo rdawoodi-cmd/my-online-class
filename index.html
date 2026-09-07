@@ -4,17 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>سامانه حضور و غیاب آنلاین</title>
-    <!-- کتابخانه Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: Tahoma, sans-serif; margin: 0; padding: 20px; background-color: #eef2f5; color: #333; }
         .container { max-width: 500px; margin: 30px auto; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); text-align: center; }
         h2 { margin-top: 0; color: #2c3e50; font-size: 22px; }
-        .user-badge { background-color: #e8f4fd; color: #1d6fce; padding: 10px 15px; border-radius: 8px; font-weight: bold; margin-bottom: 20px; display: inline-block; width: 100%; box-sizing: border-box; }
+        .user-badge { background-color: #e8f4fd; color: #1d6fce; padding: 10px 15px; border-radius: 8px; font-weight: bold; margin-bottom: 15px; display: block; text-align: right; }
+        input[type="text"] { width: 100%; padding: 10px; margin: 8px 0 15px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-family: Tahoma; }
         .btn-attendance { background-color: #27ae60; color: white; border: none; padding: 14px 20px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 18px; font-weight: bold; }
         .btn-attendance:disabled { background-color: #bdc3c7; cursor: not-allowed; }
-        .status-message { margin-top: 20px; padding: 12px; border-radius: 8px; font-weight: bold; display: none; }
+        .status-message { margin-top: 20px; padding: 12px; border-radius: 8px; font-weight: bold; display: none; text-align: right; }
         .status-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
         .status-error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
     </style>
@@ -25,7 +25,12 @@
         <div class="card">
             <h2>📌 ثبت حضور و غیاب کلاس</h2>
             
-            <div id="user-info" class="user-badge">در حال دریافت اطلاعات دانش‌آموز...</div>
+            <div id="user-info" class="user-badge">در حال دریافت اطلاعات...</div>
+
+            <div style="text-align: right; margin-bottom: 15px;">
+                <label for="custom-name"><b>نام و نام خانوادگی (جهت ثبت در دفتر حضور غیاب):</b></label>
+                <input type="text" id="custom-name" placeholder="مثلاً: علی محمدی">
+            </div>
 
             <button id="attendance-btn" class="btn-attendance" onclick="registerAttendance()" disabled>
                 در حال بررسی وضعیت...
@@ -36,26 +41,53 @@
     </div>
 
     <script>
-        // تنظیمات Supabase متصل به پروژه شما
         const SUPABASE_URL = 'https://cxnztsdhnndijpyscvvg.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_6df-9vl0Iraj7Ou0SgnV3g_1_xDneAm';
-        
-        // تغییر نام متغیر برای جلوگیری از تداخل با کتابخانه
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // دریافت پارامترهای کاربر
         const urlParams = new URLSearchParams(window.location.search);
         const studentId = urlParams.get('user_id') || 1001; 
-        const studentName = urlParams.get('name') || "دانش‌آموز نمونه";
+        const eitaaProfileName = urlParams.get('name') || "دانش‌آموز نمونه";
 
-        document.getElementById('user-info').innerText = `👤 دانش‌آموز: ${studentName} (${studentId})`;
+        document.getElementById('user-info').innerHTML = `
+            👤 <b>پروفایل ایتا:</b> ${eitaaProfileName}<br>
+            🆔 <b>شناسه:</b> ${studentId}
+        `;
+
+        // تبدیل تاریخ میلادی به شمسی
+        function getJalaliDate() {
+            return new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                timeZone: 'Asia/Tehran'
+            }).format(new Date());
+        }
+
+        // دریافت زمان فعلی ایران (ساعت و دقیقه)
+        function getIranTime() {
+            return new Intl.DateTimeFormat('fa-IR', {
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZone: 'Asia/Tehran'
+            }).format(new Date());
+        }
 
         async function initAttendance() {
             const btn = document.getElementById('attendance-btn');
+            const customNameInput = document.getElementById('custom-name');
 
             try {
-                // ثبت یا بروزرسانی دانش‌آموز در جدول اصلی
-                await supabaseClient.from('students').upsert({ id: studentId, full_name: studentName });
+                // دریافت اطلاعات قبلی دانش‌آموز در صورت وجود
+                const { data: studentData } = await supabaseClient
+                    .from('students')
+                    .select('custom_name')
+                    .eq('id', studentId)
+                    .single();
+
+                if (studentData && studentData.custom_name) {
+                    customNameInput.value = studentData.custom_name;
+                }
 
                 // بررسی حضور امروز
                 const today = new Date().toISOString().split('T')[0];
@@ -68,13 +100,13 @@
                 if (data && data.length > 0) {
                     btn.disabled = true;
                     btn.innerText = "حضور شما ثبت شده است";
-                    showStatus("✅ حضور شما برای امروز قبلاً با موفقیت ثبت شده است.", "success");
+                    showStatus(`✅ حضور شما برای امروز ثبت شده است.<br>📅 تاریخ شمسی: ${getJalaliDate()}`, "success");
                 } else {
                     btn.disabled = false;
                     btn.innerText = "ثبت حضور در کلاس";
                 }
             } catch (err) {
-                console.error("General error:", err);
+                console.error("Error:", err);
                 btn.disabled = false;
                 btn.innerText = "ثبت حضور در کلاس";
             }
@@ -82,13 +114,28 @@
 
         async function registerAttendance() {
             const btn = document.getElementById('attendance-btn');
+            const customName = document.getElementById('custom-name').value.trim();
+
+            if (!customName) {
+                alert("لطفاً نام و نام خانوادگی خود را وارد کنید.");
+                return;
+            }
+
             btn.disabled = true;
             btn.innerText = "در حال ثبت...";
 
             const today = new Date().toISOString().split('T')[0];
 
             try {
-                const { data, error } = await supabaseClient.from('attendance').insert([
+                // ۱. ثبت/آپدیت نام کاربر
+                await supabaseClient.from('students').upsert({ 
+                    id: studentId, 
+                    full_name: eitaaProfileName,
+                    custom_name: customName
+                });
+
+                // ۲. ثبت حضور
+                const { error } = await supabaseClient.from('attendance').insert([
                     { student_id: studentId, status_date: today }
                 ]);
 
@@ -103,7 +150,7 @@
                     }
                 } else {
                     btn.innerText = "حضور شما ثبت شد";
-                    showStatus("✅ حضور شما با موفقیت ثبت گردید.", "success");
+                    showStatus(`✅ حضور شما با موفقیت ثبت شد!<br>📅 تاریخ: ${getJalaliDate()}<br>⏰ ساعت: ${getIranTime()}`, "success");
                 }
             } catch (err) {
                 showStatus("❌ خطای غیرمنتظره: " + err.message, "error");
@@ -116,10 +163,9 @@
             const statusBox = document.getElementById('status-box');
             statusBox.style.display = "block";
             statusBox.className = "status-message " + (type === "success" ? "status-success" : "status-error");
-            statusBox.innerText = message;
+            statusBox.innerHTML = message;
         }
 
-        // اجرای تابع بررسی اولیه
         initAttendance();
     </script>
 </body>
