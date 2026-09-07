@@ -8,8 +8,22 @@
     <style>
         body { font-family: Tahoma, sans-serif; margin: 0; padding: 20px; background-color: #eef2f5; color: #333; }
         .container { max-width: 500px; margin: 30px auto; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); text-align: center; }
-        h2 { margin-top: 0; color: #2c3e50; font-size: 20px; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); text-align: center; position: relative; }
+        h2 { margin-top: 10px; color: #2c3e50; font-size: 20px; }
+        
+        /* استایل نمایش شماره نسخه */
+        .version-badge {
+            display: inline-block;
+            background-color: #e2e8f0;
+            color: #475569;
+            font-size: 11px;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            direction: ltr;
+        }
+
         .info-box { background-color: #e8f4fd; color: #1d6fce; padding: 12px 15px; border-radius: 8px; font-weight: bold; margin-bottom: 20px; text-align: center; font-size: 14px; border-right: 4px solid #1d6fce; }
         input[type="text"], select { width: 100%; padding: 11px; margin: 8px 0 15px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-family: Tahoma; font-size: 14px; }
         .btn-attendance { background-color: #27ae60; color: white; border: none; padding: 14px 20px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 18px; font-weight: bold; }
@@ -23,6 +37,9 @@
 
     <div class="container">
         <div class="card">
+            <!-- شماره نسخه در اینجا نمایش داده می‌شود -->
+            <span id="version-display" class="version-badge">v1.0</span>
+
             <h2>📌 ثبت حضور و غیاب کلاس</h2>
             
             <div id="user-info" class="info-box">
@@ -66,6 +83,12 @@
     </div>
 
     <script>
+        // ----------------------------------------------------
+        // تنظیم شماره نسخه برنامه (هر بار ویرایش کردید این عدد را تغییر دهید)
+        const APP_VERSION = "v1.2";
+        document.getElementById('version-display').innerText = APP_VERSION;
+        // ----------------------------------------------------
+
         const SUPABASE_URL = 'https://cxnztsdhnndijpyscvvg.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_6df-9vl0Iraj7Ou0SgnV3g_1_xDneAm';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
