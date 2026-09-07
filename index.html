@@ -10,7 +10,7 @@
         .container { max-width: 500px; margin: 30px auto; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); text-align: center; }
         h2 { margin-top: 0; color: #2c3e50; font-size: 20px; }
-        .info-box { background-color: #e8f4fd; color: #1d6fce; padding: 12px 15px; border-radius: 8px; font-weight: bold; margin-bottom: 20px; text-align: center; font-size: 14px; }
+        .info-box { background-color: #e8f4fd; color: #1d6fce; padding: 12px 15px; border-radius: 8px; font-weight: bold; margin-bottom: 20px; text-align: center; font-size: 14px; border-right: 4px solid #1d6fce; }
         input[type="text"], select { width: 100%; padding: 11px; margin: 8px 0 15px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-family: Tahoma; font-size: 14px; }
         .btn-attendance { background-color: #27ae60; color: white; border: none; padding: 14px 20px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 18px; font-weight: bold; }
         .btn-attendance:hover { background-color: #219150; }
@@ -72,9 +72,19 @@
         const SUPABASE_ANON_KEY = 'sb_publishable_6df-9vl0Iraj7Ou0SgnV3g_1_xDneAm';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+        // دریافت متغیرها از URL
         const urlParams = new URLSearchParams(window.location.search);
         const rawStudentId = urlParams.get('user_id');
-        const eitaaProfileNameFromUrl = urlParams.get('name');
+        const urlProfileName = urlParams.get('name');
+
+        const usernameInput = document.getElementById('eitaa-username');
+        const userInfoBox = document.getElementById('user-info');
+
+        // پر کردن خودکار کادر در صورت وجود اطلاعات
+        if (urlProfileName) {
+            usernameInput.value = urlProfileName;
+            userInfoBox.innerHTML = `👋 سلام <b>${urlProfileName}</b> عزیز، لطفاً درس و نام کلاس را مشخص کنید.`;
+        }
 
         function getJalaliDate() {
             return new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tehran' }).format(new Date());
@@ -87,7 +97,6 @@
         async function registerAttendance() {
             const btn = document.getElementById('attendance-btn');
             const nameInput = document.getElementById('custom-name');
-            const usernameInput = document.getElementById('eitaa-username');
             const courseSelect = document.getElementById('course-select');
             
             const customName = nameInput.value.trim();
@@ -116,18 +125,17 @@
             const iranTimeStr = getIranTime();
             const today = new Date().toISOString().split('T')[0];
 
-            // تولید آیدی عددی منحصر به فرد در صورت عدم وجود
+            // ایجاد آیدی عددی منحصر به فرد
             const studentId = rawStudentId ? parseInt(rawStudentId, 10) : Math.floor(Math.random() * 899999) + 100000;
-            const profileNameToSave = eitaaProfileNameFromUrl || eitaaUsername;
 
             try {
-                // ثبت یا به‌روزرسانی پروفایل
+                // ۱. ثبت مشخصات اکانت ایتا
                 await supabaseClient.from('students').upsert({ 
                     id: studentId, 
-                    full_name: profileNameToSave
+                    full_name: eitaaUsername
                 });
 
-                // ثبت تردد دانش‌آموز
+                // ۲. ثبت اطلاعات حضور و غیاب
                 const { error } = await supabaseClient.from('attendance').insert([
                     { 
                         student_id: studentId, 
@@ -141,9 +149,8 @@
                 if (error) {
                     showStatus("❌ خطا در ثبت حضور: " + error.message, "error");
                 } else {
-                    showStatus(`✅ حضور شما در درس <b>${selectedCourse}</b> ثبت شد!<br>👤 نام: ${customName}<br>🆔 اکانت ایتا: ${eitaaUsername}<br>📅 تاریخ: ${jalaliDateStr}<br>⏰ ساعت: ${iranTimeStr}`, "success");
+                    showStatus(`✅ حضور شما در درس <b>${selectedCourse}</b> ثبت شد!<br>👤 نام: ${customName}<br>🆔 اکانت ایتا: ${eitaaUsername}<br>📅 تاریخ: ${jalaliDateStr}`, "success");
                     nameInput.value = '';
-                    usernameInput.value = '';
                     courseSelect.value = '';
                 }
             } catch (err) {
