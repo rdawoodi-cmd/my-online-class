@@ -3,111 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>کلاس آنلاین من</title>
+    <title>سامانه حضور و غیاب آنلاین</title>
     <!-- کتابخانه Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: Tahoma, sans-serif; margin: 0; padding: 15px; background-color: #f4f6f9; }
-        .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }
-        button { background-color: #28a745; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; width: 100%; font-size: 16px; }
-        input, textarea { width: 100%; padding: 8px; margin: 5px 0 10px 0; box-sizing: border-box; }
-        .chat-box { height: 200px; overflow-y: scroll; border: 1px solid #ddd; padding: 10px; border-radius: 5px; background: #fafafa; }
-        .chat-msg { margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: #eef2f5; color: #333; }
+        .container { max-width: 500px; margin: 30px auto; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); text-align: center; }
+        h2 { margin-top: 0; color: #2c3e50; font-size: 22px; }
+        .user-badge { background-color: #e8f4fd; color: #1d6fce; padding: 10px 15px; border-radius: 8px; font-weight: bold; margin-bottom: 20px; display: inline-block; width: 100%; box-sizing: border-box; }
+        .btn-attendance { background-color: #27ae60; color: white; border: none; padding: 14px 20px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 18px; font-weight: bold; transition: background 0.3s; }
+        .btn-attendance:hover { background-color: #219150; }
+        .btn-attendance:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+        .status-message { margin-top: 20px; padding: 12px; border-radius: 8px; font-weight: bold; display: none; }
+        .status-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status-error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
     </style>
 </head>
 <body>
 
-    <h2>🏫 سامانه کلاس آنلاین</h2>
-    
-    <!-- ۱. بخش حضور و غیاب -->
-    <div class="card">
-        <h3>📌 حضور و غیاب</h3>
-        <p id="user-info">در حال دریافت اطلاعات کاربر...</p>
-        <button onclick="registerAttendance()">ثبت حضور در کلاس</button>
-        <p id="attendance-status" style="color: green;"></p>
-    </div>
+    <div class="container">
+        <div class="card">
+            <h2>📌 ثبت حضور و غیاب کلاس</h2>
+            
+            <div id="user-info" class="user-badge">در حال دریافت اطلاعات دانش‌آموز...</div>
 
-    <!-- ۲. بخش چت آنلاین کلاس -->
-    <div class="card">
-        <h3>💬 چت کلاس</h3>
-        <div id="chat-box" class="chat-box"></div>
-        <input type="text" id="msg-input" placeholder="پیام خود را بنویسید...">
-        <button style="background-color: #007bff;" onclick="sendMessage()">ارسال پیام</button>
+            <button id="attendance-btn" class="btn-attendance" onclick="registerAttendance()" disabled>
+                ثبت حضور در کلاس
+            </button>
+
+            <div id="status-box" class="status-message"></div>
+        </div>
     </div>
 
     <script>
-        // تنظیمات متصل‌شده به دیتابیس سوپابیس شما
+        // تنظیمات Supabase متصل به پروژه شما
         const SUPABASE_URL = 'https://cxnztsdhnndijpyscvvg.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_6df-9vl0Iraj7Ou0SgnV3g_1_xDneAm';
         const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // دریافت شناسه کاربر (از URL یا به صورت آزمایشی)
+        // دریافت شناسه و نام کاربر از URL
         const urlParams = new URLSearchParams(window.location.search);
         const studentId = urlParams.get('user_id') || 1001; 
         const studentName = urlParams.get('name') || "دانش‌آموز نمونه";
 
-        document.getElementById('user-info').innerText = `خوش آمدید: ${studentName} (شناسه: ${studentId})`;
+        document.getElementById('user-info').innerText = `👤 دانش‌آموز: ${studentName} (${studentId})`;
 
-        // ثیت یا به‌روزرسانی مشخصات کاربر
-        async function initUser() {
+        // ۱. بررسی اولیه هنگام ورود به صفحه
+        async function initAttendance() {
+            // ثبت یا بروزرسانی مشخصات دانش‌آموز در جدول اصلی
             await supabase.from('students').upsert({ id: studentId, full_name: studentName });
-            loadMessages();
-            listenToNewMessages();
-        }
 
-        // عملکرد ثبت حضور و غیاب
-        async function registerAttendance() {
-            const { data, error } = await supabase.from('attendance').insert([
-                { student_id: studentId }
-            ]);
+            // بررسی اینکه آیا امروز حضور زده است یا خیر
+            const today = new Date().toISOString().split('T')[0];
             
-            if (error) {
-                alert("خطا در ثبت حضور: " + error.message);
+            const { data, error } = await supabase
+                .from('attendance')
+                .select('*')
+                .eq('student_id', studentId)
+                .eq('status_date', today);
+
+            const btn = document.getElementById('attendance-btn');
+            const statusBox = document.getElementById('status-box');
+
+            if (data && data.length > 0) {
+                // حضور ثبت شده است
+                btn.disabled = true;
+                btn.innerText = "حضور شما ثبت شده است";
+                showStatus("✅ حضور شما برای امروز قبلاً با موفقیت ثبت شده است.", "success");
             } else {
-                document.getElementById('attendance-status').innerText = "✅ حضور شما با موفقیت ثبت شد!";
+                // هنوز حضور نزده است
+                btn.disabled = false;
+                btn.innerText = "ثبت حضور در کلاس";
             }
         }
 
-        // ارسال پیام در چت
-        async function sendMessage() {
-            const input = document.getElementById('msg-input');
-            const content = input.value.trim();
-            if (!content) return;
+        // ۲. ثبت حضور با کلیک روی دکمه
+        async function registerAttendance() {
+            const btn = document.getElementById('attendance-btn');
+            btn.disabled = true;
+            btn.innerText = "در حال ثبت...";
 
-            await supabase.from('messages').insert([
-                { student_id: studentId, sender_name: studentName, content: content }
+            const today = new Date().toISOString().split('T')[0];
+
+            const { data, error } = await supabase.from('attendance').insert([
+                { student_id: studentId, status_date: today }
             ]);
-            input.value = '';
-        }
 
-        // بارگذاری پیام‌ها
-        async function loadMessages() {
-            const { data: messages } = await supabase.from('messages').select('*').order('created_at', { ascending: true });
-            const chatBox = document.getElementById('chat-box');
-            chatBox.innerHTML = '';
-            if (messages) {
-                messages.forEach(msg => {
-                    chatBox.innerHTML += `<div class="chat-msg"><b>${msg.sender_name}:</b> ${msg.content}</div>`;
-                });
-                chatBox.scrollTop = chatBox.scrollHeight;
+            if (error) {
+                if (error.code === '23505') { // کد خطای ثبت تکراری
+                    showStatus("⚠️ حضور شما برای امروز قبلاً ثبت شده است!", "error");
+                } else {
+                    showStatus("❌ خطا در ثبت حضور: " + error.message, "error");
+                    btn.disabled = false;
+                    btn.innerText = "ثبت حضور در کلاس";
+                }
+            } else {
+                btn.innerText = "حضور شما ثبت شد";
+                showStatus("✅ حضور شما با موفقیت ثبت گردید.", "success");
             }
         }
 
-        // دریافت لحظه‌ای پیام‌ها (Realtime)
-        function listenToNewMessages() {
-            supabase
-                .channel('public:messages')
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
-                    const msg = payload.new;
-                    const chatBox = document.getElementById('chat-box');
-                    chatBox.innerHTML += `<div class="chat-msg"><b>${msg.sender_name}:</b> ${msg.content}</div>`;
-                    chatBox.scrollTop = chatBox.scrollHeight;
-                })
-                .subscribe();
+        function showStatus(message, type) {
+            const statusBox = document.getElementById('status-box');
+            statusBox.style.display = "block";
+            statusBox.className = "status-message " + (type === "success" ? "status-success" : "status-error");
+            statusBox.innerText = message;
         }
 
-        // اجرای اولیه هنگام باز شدن صفحه
-        initUser();
+        // اجرای تابع بررسی هنگام بارگذاری صفحه
+        initAttendance();
     </script>
 </body>
 </html>
