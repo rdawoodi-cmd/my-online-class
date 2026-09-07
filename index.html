@@ -4,14 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>سامانه حضور و غیاب آنلاین</title>
-    <!-- اسکریپت رسمی وب‌اپ ایتا -->
     <script src="https://developer.eitaa.com/eitaa-web-app.js"></script>
-    <!-- کتابخانه سوپابیس -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: Tahoma, sans-serif; margin: 0; padding: 20px; background-color: #eef2f5; color: #333; }
-        .container { max-width: 500px; margin: 30px auto; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); text-align: center; position: relative; }
+        .container { max-width: 550px; margin: 20px auto; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); text-align: center; position: relative; margin-bottom: 20px; }
         h2 { margin-top: 10px; color: #2c3e50; font-size: 20px; }
         
         .version-badge {
@@ -27,20 +25,32 @@
         }
 
         .info-box { background-color: #e8f4fd; color: #1d6fce; padding: 12px 15px; border-radius: 8px; font-weight: bold; margin-bottom: 20px; text-align: center; font-size: 14px; border-right: 4px solid #1d6fce; }
-        input[type="text"], select { width: 100%; padding: 11px; margin: 8px 0 15px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-family: Tahoma; font-size: 14px; }
+        input[type="text"], input[type="date"], select { width: 100%; padding: 11px; margin: 8px 0 15px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-family: Tahoma; font-size: 14px; }
+        
         .btn-attendance { background-color: #27ae60; color: white; border: none; padding: 14px 20px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 18px; font-weight: bold; }
         .btn-attendance:hover { background-color: #219150; }
+
+        .btn-teacher { background-color: #2980b9; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 15px; font-weight: bold; margin-top: 10px; }
+        .btn-teacher:hover { background-color: #2471a3; }
+
+        .btn-back { background-color: #7f8c8d; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 15px; font-weight: bold; margin-bottom: 15px; }
+        .btn-back:hover { background-color: #707b7c; }
+
         .status-message { margin-top: 20px; padding: 12px; border-radius: 8px; font-weight: bold; display: none; text-align: right; }
         .status-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
         .status-error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+        .report-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; text-align: right; }
+        .report-table th, .report-table td { border: 1px solid #ddd; padding: 8px; }
+        .report-table th { background-color: #f2f2f2; color: #333; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <div class="card">
-            <span id="version-display" class="version-badge">v1.6</span>
-
+        <!-- بخش دانش‌آموز -->
+        <div id="student-view" class="card">
+            <span id="version-display" class="version-badge">v1.7</span>
             <h2>📌 ثبت حضور و غیاب کلاس</h2>
             
             <div id="user-info" class="info-box">
@@ -76,12 +86,56 @@
                 ثبت حضور در کلاس
             </button>
 
+            <button class="btn-teacher" onclick="switchToTeacherView()">
+                🔐 ورود دبیر (پنل مدیریت)
+            </button>
+
             <div id="status-box" class="status-message"></div>
+        </div>
+
+        <!-- بخش پنل دبیر -->
+        <div id="teacher-view" class="card" style="display: none;">
+            <h2>📊 پنل گزارش‌گیری دبیر</h2>
+            
+            <button class="btn-back" onclick="switchToStudentView()">
+                🔙 بازگشت به صفحه دانش‌آموز
+            </button>
+
+            <div style="text-align: right; margin-bottom: 10px;">
+                <label for="report-course"><b>انتخاب درس:</b></label>
+                <select id="report-course">
+                    <option value="">-- همه درس‌ها --</option>
+                    <option value="فرهنگ و هنر">فرهنگ و هنر</option>
+                    <option value="آموزش قرآن">آموزش قرآن</option>
+                    <option value="پیام‌های آسمان">پیام‌های آسمان</option>
+                    <option value="فارسی">فارسی</option>
+                    <option value="نگارش (آموزش مهارت‌های نوشتاری)">نگارش (آموزش مهارت‌های نوشتاری)</option>
+                    <option value="ریاضی">ریاضی</option>
+                    <option value="علوم تجربی">علوم تجربی</option>
+                    <option value="مطالعات اجتماعی">مطالعات اجتماعی</option>
+                    <option value="تفکر و سبک زندگی">تفکر و سبک زندگی</option>
+                    <option value="زبان انگلیسی">زبان انگلیسی</option>
+                    <option value="زبان عربی">زبان عربی</option>
+                    <option value="کار و فناوری">کار و فناوری</option>
+                    <option value="تربیت بدنی و سلامت">تربیت بدنی و سلامت</option>
+                </select>
+            </div>
+
+            <div style="text-align: right; margin-bottom: 15px;">
+                <label for="report-date"><b>تاریخ (شمسی):</b></label>
+                <input type="text" id="report-date" placeholder="مثلاً: ۱۴۰۵/۰۶/۱۷">
+            </div>
+
+            <button class="btn-attendance" style="background-color: #2980b9;" onclick="fetchAttendanceReport()">
+                دریافت گزارش حضور و غیاب
+            </button>
+
+            <div id="report-result" style="margin-top: 20px; overflow-x: auto;"></div>
         </div>
     </div>
 
     <script>
-        const APP_VERSION = "v1.6";
+        const APP_VERSION = "v1.7";
         document.getElementById('version-display').innerText = APP_VERSION;
 
         const SUPABASE_URL = 'https://cxnztsdhnndijpyscvvg.supabase.co';
@@ -117,10 +171,23 @@
             return new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tehran' }).format(new Date());
         }
 
+        // جابجایی بین پنل‌ها
+        function switchToTeacherView() {
+            document.getElementById('student-view').style.display = 'none';
+            document.getElementById('teacher-view').style.display = 'block';
+            // پیش‌فرض تاریخ امروز شمسی را قرار می‌دهد
+            document.getElementById('report-date').value = getJalaliDate();
+        }
+
+        function switchToStudentView() {
+            document.getElementById('teacher-view').style.display = 'none';
+            document.getElementById('student-view').style.display = 'block';
+        }
+
         async function registerAttendance() {
             const btn = document.getElementById('attendance-btn');
             const nameInput = document.getElementById('custom-name');
-            courseSelect = document.getElementById('course-select');
+            const courseSelect = document.getElementById('course-select');
             
             const customName = nameInput.value.trim();
             const selectedCourse = courseSelect.value;
@@ -140,7 +207,6 @@
 
             const jalaliDateStr = getJalaliDate();
             const today = new Date().toISOString().split('T')[0];
-
             const finalStudentId = currentEitaaUserId ? parseInt(currentEitaaUserId, 10) : Math.floor(Math.random() * 899999) + 100000;
 
             try {
@@ -173,6 +239,66 @@
             } finally {
                 btn.disabled = false;
                 btn.innerText = "ثبت حضور در کلاس (مجدد)";
+            }
+        }
+
+        async function fetchAttendanceReport() {
+            const course = document.getElementById('report-course').value;
+            const dateStr = document.getElementById('report-date').value.trim();
+            const resultDiv = document.getElementById('report-result');
+
+            resultDiv.innerHTML = "در حال بارگذاری گزارش...";
+
+            try {
+                let query = supabaseClient.from('attendance').select('*').order('created_at', { ascending: false });
+
+                if (course) {
+                    query = query.eq('subject', course);
+                }
+                if (dateStr) {
+                    query = query.eq('jalali_date', dateStr);
+                }
+
+                const { data, error } = await query;
+
+                if (error) {
+                    resultDiv.innerHTML = `<p style="color: red;">خطا در دریافت گزارش: ${error.message}</p>`;
+                    return;
+                }
+
+                if (!data || data.length === 0) {
+                    resultDiv.innerHTML = `<p style="color: #666; margin-top: 15px;">رکوردی برای این مشخصات یافت نشد.</p>`;
+                    return;
+                }
+
+                let html = `<p style="font-weight: bold; text-align: right;">تعداد موارد یافت شده: ${data.length}</p>`;
+                html += `<table class="report-table">
+                            <thead>
+                               <tr>
+                                   <th>ردیف</th>
+                                   <th>نام دانش‌آموز</th>
+                                   <th>درس</th>
+                                   <th>تاریخ</th>
+                                   <th>پروفایل ایتا</th>
+                               </tr>
+                            </thead>
+                            <tbody>`;
+
+                data.forEach((row, index) => {
+                    html += `<tr>
+                                <td>${index + 1}</td>
+                                <td><b>${row.entered_name || 'نامشخص'}</b></td>
+                                <td>${row.subject || '-'}</td>
+                                <td>${row.jalali_date || '-'}</td>
+                                <td>${row.eitaa_profile_name || 'ثبت نشده'}</td>
+                             </tr>`;
+                });
+
+                html += `</tbody></table>`;
+                resultDiv.innerHTML = html;
+
+            } catch (err) {
+                resultDiv.innerHTML = `<p style="color: red;">خطا: ${err.message}</p>`;
             }
         }
 
