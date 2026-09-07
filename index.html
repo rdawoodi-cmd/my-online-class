@@ -44,9 +44,9 @@
         const SUPABASE_ANON_KEY = 'sb_publishable_6df-9vl0Iraj7Ou0SgnV3g_1_xDneAm';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // دریافت اطلاعات از لینک ایتا (اگر مستقیم باز شود مقادیر تستی نشان می‌دهد)
         const urlParams = new URLSearchParams(window.location.search);
-        const studentId = urlParams.get('user_id') || "1001 (تستی)"; 
+        const rawStudentId = urlParams.get('user_id');
+        const studentId = rawStudentId ? parseInt(rawStudentId, 10) : 1001;
         const eitaaProfileName = urlParams.get('name') || "بدون نام (تستی)";
 
         document.getElementById('user-info').innerHTML = `
@@ -64,29 +64,31 @@
 
         async function registerAttendance() {
             const btn = document.getElementById('attendance-btn');
-            const customName = document.getElementById('custom-name').value.trim();
+            const nameInput = document.getElementById('custom-name');
+            const customName = nameInput.value.trim();
 
             if (!customName) {
                 alert("❌ برای ثبت حضور، حتماً باید نام و نام خانوادگی خود را در کادر بالا تایپ کنید!");
                 return;
             }
 
+            btn.disabled = true;
             btn.innerText = "در حال ثبت...";
             const today = new Date().toISOString().split('T')[0];
 
             try {
-                // ثبت کاربر در جدول کلی (فقط برای ثبت آیدی ایتا)
+                // آپدیت اطلاعات کاربر در جدول کلی
                 await supabaseClient.from('students').upsert({ 
-                    id: urlParams.get('user_id') || 1001, 
+                    id: studentId, 
                     full_name: eitaaProfileName
                 });
 
-                // ثبت حضور همراه با نامی که دقیقاً همین الان تایپ شده
+                // ثبت حضور (بدون محدودیتی برای تعداد ثبت)
                 const { error } = await supabaseClient.from('attendance').insert([
                     { 
-                        student_id: urlParams.get('user_id') || 1001, 
+                        student_id: studentId, 
                         status_date: today,
-                        entered_name: customName // ذخیره نام در برگه حضور
+                        entered_name: customName
                     }
                 ]);
 
@@ -94,11 +96,12 @@
                     showStatus("❌ خطا در ثبت حضور: " + error.message, "error");
                 } else {
                     showStatus(`✅ حضور شما با نام <b>${customName}</b> ثبت شد!<br>📅 تاریخ: ${getJalaliDate()}<br>⏰ ساعت: ${getIranTime()}`, "success");
-                    document.getElementById('custom-name').value = ''; // خالی کردن کادر بعد از ثبت
+                    nameInput.value = ''; // خالی کردن کادر برای ثبت بعدی
                 }
             } catch (err) {
                 showStatus("❌ خطای غیرمنتظره: " + err.message, "error");
             } finally {
+                btn.disabled = false;
                 btn.innerText = "ثبت حضور در کلاس (مجدد)";
             }
         }
