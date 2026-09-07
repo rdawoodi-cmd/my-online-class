@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>سامانه حضور و غیاب آنلاین</title>
+    <title>سامانه حضور و غیاب آنلاین (حالت تست)</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: Tahoma, sans-serif; margin: 0; padding: 20px; background-color: #eef2f5; color: #333; }
@@ -13,7 +13,6 @@
         .user-badge { background-color: #e8f4fd; color: #1d6fce; padding: 10px 15px; border-radius: 8px; font-weight: bold; margin-bottom: 15px; display: block; text-align: right; }
         input[type="text"] { width: 100%; padding: 10px; margin: 8px 0 15px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-family: Tahoma; }
         .btn-attendance { background-color: #27ae60; color: white; border: none; padding: 14px 20px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 18px; font-weight: bold; }
-        .btn-attendance:disabled { background-color: #bdc3c7; cursor: not-allowed; }
         .status-message { margin-top: 20px; padding: 12px; border-radius: 8px; font-weight: bold; display: none; text-align: right; }
         .status-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
         .status-error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
@@ -23,7 +22,7 @@
 
     <div class="container">
         <div class="card">
-            <h2>📌 ثبت حضور و غیاب کلاس</h2>
+            <h2>📌 ثبت حضور و غیاب کلاس (حالت تست)</h2>
             
             <div id="user-info" class="user-badge">در حال دریافت اطلاعات...</div>
 
@@ -32,8 +31,8 @@
                 <input type="text" id="custom-name" placeholder="مثلاً: علی محمدی">
             </div>
 
-            <button id="attendance-btn" class="btn-attendance" onclick="registerAttendance()" disabled>
-                در حال بررسی وضعیت...
+            <button id="attendance-btn" class="btn-attendance" onclick="registerAttendance()">
+                ثبت حضور در کلاس
             </button>
 
             <div id="status-box" class="status-message"></div>
@@ -54,7 +53,6 @@
             🆔 <b>شناسه:</b> ${studentId}
         `;
 
-        // تبدیل تاریخ میلادی به شمسی
         function getJalaliDate() {
             return new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
                 year: 'numeric',
@@ -64,7 +62,6 @@
             }).format(new Date());
         }
 
-        // دریافت زمان فعلی ایران (ساعت و دقیقه)
         function getIranTime() {
             return new Intl.DateTimeFormat('fa-IR', {
                 hour: '2-digit',
@@ -74,11 +71,8 @@
         }
 
         async function initAttendance() {
-            const btn = document.getElementById('attendance-btn');
             const customNameInput = document.getElementById('custom-name');
-
             try {
-                // دریافت اطلاعات قبلی دانش‌آموز در صورت وجود
                 const { data: studentData } = await supabaseClient
                     .from('students')
                     .select('custom_name')
@@ -88,27 +82,8 @@
                 if (studentData && studentData.custom_name) {
                     customNameInput.value = studentData.custom_name;
                 }
-
-                // بررسی حضور امروز
-                const today = new Date().toISOString().split('T')[0];
-                const { data, error } = await supabaseClient
-                    .from('attendance')
-                    .select('*')
-                    .eq('student_id', studentId)
-                    .eq('status_date', today);
-
-                if (data && data.length > 0) {
-                    btn.disabled = true;
-                    btn.innerText = "حضور شما ثبت شده است";
-                    showStatus(`✅ حضور شما برای امروز ثبت شده است.<br>📅 تاریخ شمسی: ${getJalaliDate()}`, "success");
-                } else {
-                    btn.disabled = false;
-                    btn.innerText = "ثبت حضور در کلاس";
-                }
             } catch (err) {
-                console.error("Error:", err);
-                btn.disabled = false;
-                btn.innerText = "ثبت حضور در کلاس";
+                console.error("Error loading user:", err);
             }
         }
 
@@ -121,41 +96,32 @@
                 return;
             }
 
-            btn.disabled = true;
             btn.innerText = "در حال ثبت...";
 
             const today = new Date().toISOString().split('T')[0];
 
             try {
-                // ۱. ثبت/آپدیت نام کاربر
+                // ثبت/آپدیت نام کاربر
                 await supabaseClient.from('students').upsert({ 
                     id: studentId, 
                     full_name: eitaaProfileName,
                     custom_name: customName
                 });
 
-                // ۲. ثبت حضور
+                // ثبت حضور
                 const { error } = await supabaseClient.from('attendance').insert([
                     { student_id: studentId, status_date: today }
                 ]);
 
                 if (error) {
-                    if (error.code === '23505') {
-                        showStatus("⚠️ حضور شما برای امروز قبلاً ثبت شده است!", "error");
-                        btn.innerText = "حضور شما ثبت شده است";
-                    } else {
-                        showStatus("❌ خطا در ثبت حضور: " + error.message, "error");
-                        btn.disabled = false;
-                        btn.innerText = "ثبت حضور در کلاس";
-                    }
+                    showStatus("❌ خطا در ثبت حضور: " + error.message, "error");
                 } else {
-                    btn.innerText = "حضور شما ثبت شد";
-                    showStatus(`✅ حضور شما با موفقیت ثبت شد!<br>📅 تاریخ: ${getJalaliDate()}<br>⏰ ساعت: ${getIranTime()}`, "success");
+                    showStatus(`✅ حضور تست با موفقیت ثبت شد!<br>📅 تاریخ: ${getJalaliDate()}<br>⏰ ساعت: ${getIranTime()}`, "success");
                 }
             } catch (err) {
                 showStatus("❌ خطای غیرمنتظره: " + err.message, "error");
-                btn.disabled = false;
-                btn.innerText = "ثبت حضور در کلاس";
+            } finally {
+                btn.innerText = "ثبت حضور در کلاس (مجدد)";
             }
         }
 
