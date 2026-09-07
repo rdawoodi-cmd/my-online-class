@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>سامانه حضور و غیاب آنلاین</title>
+    <!-- کتابخانه وب‌اپ ایتا -->
+    <script src="https://developer.eitaa.com/eitaa-web-app.js"></script>
+    <!-- کتابخانه سوپابیس -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: Tahoma, sans-serif; margin: 0; padding: 20px; background-color: #eef2f5; color: #333; }
@@ -11,7 +14,6 @@
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); text-align: center; position: relative; }
         h2 { margin-top: 10px; color: #2c3e50; font-size: 20px; }
         
-        /* استایل نمایش شماره نسخه */
         .version-badge {
             display: inline-block;
             background-color: #e2e8f0;
@@ -37,13 +39,12 @@
 
     <div class="container">
         <div class="card">
-            <!-- شماره نسخه در اینجا نمایش داده می‌شود -->
-            <span id="version-display" class="version-badge">v1.0</span>
+            <span id="version-display" class="version-badge">v1.4</span>
 
             <h2>📌 ثبت حضور و غیاب کلاس</h2>
             
             <div id="user-info" class="info-box">
-                لطفاً اطلاعات زیر را جهت ثبت حضور دقیق وارد کنید
+                در حال دریافت اطلاعات کاربر ایتا...
             </div>
 
             <div style="text-align: right; margin-bottom: 10px;">
@@ -71,9 +72,6 @@
                 <input type="text" id="custom-name" placeholder="مثلاً: علی محمدی">
             </div>
 
-            <!-- ذخیره مخفی نام/آیدی ایتا -->
-            <input type="hidden" id="eitaa-username">
-
             <button id="attendance-btn" class="btn-attendance" onclick="registerAttendance()">
                 ثبت حضور در کلاس
             </button>
@@ -83,28 +81,40 @@
     </div>
 
     <script>
-        // ----------------------------------------------------
-        // تنظیم شماره نسخه برنامه (هر بار ویرایش کردید این عدد را تغییر دهید)
-        const APP_VERSION = "v1.2";
+        const APP_VERSION = "v1.4";
         document.getElementById('version-display').innerText = APP_VERSION;
-        // ----------------------------------------------------
 
         const SUPABASE_URL = 'https://cxnztsdhnndijpyscvvg.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_6df-9vl0Iraj7Ou0SgnV3g_1_xDneAm';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // دریافت پارامترهای ارسال شده از ایتا
-        const urlParams = new URLSearchParams(window.location.search);
-        const rawStudentId = urlParams.get('user_id');
-        
-        // استخراج هوشمند نام پروفایل از پارامترهای مختلف
-        const detectedName = urlParams.get('firstname') || 
-                             urlParams.get('name') || 
-                             urlParams.get('username') || 
-                             (rawStudentId ? `کاربر ایتا (${rawStudentId})` : 'نامشخص (ارسال نشده)');
+        // ۱. تعریف متغیرها برای ذخیره اطلاعات کاربر ایتا
+        let currentEitaaUserId = null;
+        let currentEitaaProfileName = '';
 
-        // ذخیره نام شناسایی‌شده در فیلد مخفی
-        document.getElementById('eitaa-username').value = detectedName;
+        // ۲. متدی که کدی که فرستادید در آن قرار دارد
+        function initEitaaUser() {
+            try {
+                const wa = window.Eitaa && window.Eitaa.WebApp;
+                if (wa && wa.initDataUnsafe && wa.initDataUnsafe.user) {
+                    const user = wa.initDataUnsafe.user;
+                    currentEitaaUserId = user.id; // آیدی عددی کاربر ایتا
+                    currentEitaaProfileName = [user.first_name, user.last_name].filter(Boolean).join(" "); // نام کاربر
+                }
+            } catch (e) {
+                console.log("خطا در خواندن وب‌اپ ایتا:", e);
+            }
+
+            const infoBox = document.getElementById('user-info');
+            if (currentEitaaUserId) {
+                infoBox.innerHTML = `👤 کاربر ایتا: <b>${currentEitaaProfileName}</b> (آیدی: ${currentEitaaUserId})`;
+            } else {
+                infoBox.innerHTML = `لطفاً اطلاعات زیر را جهت ثبت حضور وارد کنید`;
+            }
+        }
+
+        // فراخوانی هنگام لود کامل صفحه
+        document.addEventListener('DOMContentLoaded', initEitaaUser);
 
         function getJalaliDate() {
             return new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tehran' }).format(new Date());
@@ -116,7 +126,6 @@
             const courseSelect = document.getElementById('course-select');
             
             const customName = nameInput.value.trim();
-            const eitaaProfileName = document.getElementById('eitaa-username').value;
             const selectedCourse = courseSelect.value;
 
             if (!selectedCourse) {
@@ -135,23 +144,25 @@
             const jalaliDateStr = getJalaliDate();
             const today = new Date().toISOString().split('T')[0];
 
-            const studentId = rawStudentId ? parseInt(rawStudentId, 10) : Math.floor(Math.random() * 899999) + 100000;
+            const finalStudentId = currentEitaaUserId ? parseInt(currentEitaaUserId, 10) : Math.floor(Math.random() * 899999) + 100000;
 
             try {
-                // ۱. ثبت مشخصات در جدول students
+                // ثبت در جدول دانش‌آموزان
                 await supabaseClient.from('students').upsert({ 
-                    id: studentId, 
-                    full_name: eitaaProfileName
+                    id: finalStudentId, 
+                    full_name: currentEitaaProfileName || customName
                 });
 
-                // ۲. ثبت اطلاعات حضور و غیاب
+                // ثبت در جدول حضور و غیاب همراه با آیدی و نام ایتا
                 const { error } = await supabaseClient.from('attendance').insert([
                     { 
-                        student_id: studentId, 
+                        student_id: finalStudentId, 
                         status_date: today,
                         entered_name: customName,
                         subject: selectedCourse,
-                        jalali_date: jalaliDateStr
+                        jalali_date: jalaliDateStr,
+                        eitaa_user_id: currentEitaaUserId,
+                        eitaa_profile_name: currentEitaaProfileName
                     }
                 ]);
 
@@ -178,4 +189,4 @@
         }
     </script>
 </body>
-</html>
+</html>ّّ
