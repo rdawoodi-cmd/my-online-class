@@ -11,7 +11,7 @@
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); text-align: center; }
         h2 { margin-top: 0; color: #2c3e50; font-size: 22px; }
         .user-badge { background-color: #e8f4fd; color: #1d6fce; padding: 10px 15px; border-radius: 8px; font-weight: bold; margin-bottom: 15px; display: block; text-align: right; }
-        input[type="text"] { width: 100%; padding: 10px; margin: 8px 0 15px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-family: Tahoma; }
+        input[type="text"], select { width: 100%; padding: 10px; margin: 8px 0 15px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-family: Tahoma; font-size: 14px; }
         .btn-attendance { background-color: #27ae60; color: white; border: none; padding: 14px 20px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 18px; font-weight: bold; }
         .status-message { margin-top: 20px; padding: 12px; border-radius: 8px; font-weight: bold; display: none; text-align: right; }
         .status-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
@@ -26,8 +26,22 @@
             
             <div id="user-info" class="user-badge">در حال دریافت اطلاعات...</div>
 
+            <div style="text-align: right; margin-bottom: 10px;">
+                <label for="course-select"><b>انتخاب درس:</b> <small style="color: red;">*</small></label>
+                <select id="course-select">
+                    <option value="">-- لطفاً درس را انتخاب کنید --</option>
+                    <option value="ریاضی">ریاضی</option>
+                    <option value="علوم">علوم</option>
+                    <option value="فارسی">فارسی</option>
+                    <option value="قرآن">قرآن</option>
+                    <option value="هدیه‌های آسمان">هدیه‌های آسمان</option>
+                    <option value="مطالعات اجتماعی">مطالعات اجتماعی</option>
+                    <option value="زبان انگلیسی">زبان انگلیسی</option>
+                </select>
+            </div>
+
             <div style="text-align: right; margin-bottom: 15px;">
-                <label for="custom-name"><b>نام و نام خانوادگی واقعی دانش‌آموز:</b><br><small style="color: red;">(نوشتن نام الزامی است)</small></label>
+                <label for="custom-name"><b>نام و نام خانوادگی دانش‌آموز:</b> <small style="color: red;">*</small></label>
                 <input type="text" id="custom-name" placeholder="نام خود را اینجا بنویسید...">
             </div>
 
@@ -59,44 +73,57 @@
         }
 
         function getIranTime() {
-            return new Intl.DateTimeFormat('fa-IR', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tehran' }).format(new Date());
+            return new Intl.DateTimeFormat('fa-IR', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Tehran' }).format(new Date());
         }
 
         async function registerAttendance() {
             const btn = document.getElementById('attendance-btn');
             const nameInput = document.getElementById('custom-name');
+            const courseSelect = document.getElementById('course-select');
+            
             const customName = nameInput.value.trim();
+            const selectedCourse = courseSelect.value;
+
+            if (!selectedCourse) {
+                alert("❌ لطفاً درس مورد نظر را از لیست انتخاب کنید!");
+                return;
+            }
 
             if (!customName) {
-                alert("❌ برای ثبت حضور، حتماً باید نام و نام خانوادگی خود را در کادر بالا تایپ کنید!");
+                alert("❌ لطفاً نام و نام خانوادگی خود را وارد کنید!");
                 return;
             }
 
             btn.disabled = true;
             btn.innerText = "در حال ثبت...";
+
+            const jalaliDateStr = getJalaliDate();
+            const iranTimeStr = getIranTime();
             const today = new Date().toISOString().split('T')[0];
 
             try {
-                // آپدیت اطلاعات کاربر در جدول کلی
                 await supabaseClient.from('students').upsert({ 
                     id: studentId, 
                     full_name: eitaaProfileName
                 });
 
-                // ثبت حضور (بدون محدودیتی برای تعداد ثبت)
                 const { error } = await supabaseClient.from('attendance').insert([
                     { 
                         student_id: studentId, 
                         status_date: today,
-                        entered_name: customName
+                        entered_name: customName,
+                        subject: selectedCourse,
+                        jalali_date: jalaliDateStr,
+                        iran_time: iranTimeStr
                     }
                 ]);
 
                 if (error) {
                     showStatus("❌ خطا در ثبت حضور: " + error.message, "error");
                 } else {
-                    showStatus(`✅ حضور شما با نام <b>${customName}</b> ثبت شد!<br>📅 تاریخ: ${getJalaliDate()}<br>⏰ ساعت: ${getIranTime()}`, "success");
-                    nameInput.value = ''; // خالی کردن کادر برای ثبت بعدی
+                    showStatus(`✅ حضور شما در درس <b>${selectedCourse}</b> با نام <b>${customName}</b> ثبت شد!<br>📅 تاریخ: ${jalaliDateStr}<br>⏰ ساعت: ${iranTimeStr}`, "success");
+                    nameInput.value = '';
+                    courseSelect.value = '';
                 }
             } catch (err) {
                 showStatus("❌ خطای غیرمنتظره: " + err.message, "error");
